@@ -1,0 +1,65 @@
+﻿# Object files
+*.o
+*.ko
+*.obj
+*.elf
+*.build_log.htm
+*.lnp
+*.bin
+*.crf
+*.dep
+*.axf
+*.map
+*.htm
+*.d
+*.sct
+*.iex
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# doc
+*.html
+*.js
+*.pdf
+*.rtf
+*.png
+*.css
+*.jpeg
+*.jpg
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+#*.hex
+
+# Debug files
+*.dSYM/
+
+#ignore  file folder
+/Output/
+/Listing/
+
+#My config	自定义配置，写后缀即可，子文件夹内的该类文件也会被忽略
+#屏蔽整个文件夹target写法：target/
+#只忽略特定文件：文件名.类型
+*.uvgui.DammStangerTS
+*.uvopt
+*.uvproj
+*.uvguix.DammStanger
+*.m51
+*.docx
