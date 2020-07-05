@@ -68,7 +68,7 @@ void main(void)
   
 //    uint8_t buflen = 0;
 //    uint8_t i = 0;
-    
+    uint8_t buttom_sta_last = 0;
     
     /*High speed internal clock prescaler: 1*/
     CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
@@ -77,6 +77,7 @@ void main(void)
     GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
     GPIO_Init(PWR_LIGHT_GPIO_PORT, (GPIO_Pin_TypeDef)PWR_LIGHT_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
     GPIO_Init(PWR_FAN_GPIO_PORT, (GPIO_Pin_TypeDef)PWR_FAN_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
+    GPIO_Init(GPIOD, (GPIO_Pin_TypeDef)GPIO_PIN_4, GPIO_MODE_IN_FL_NO_IT);
 
 //    uart1_config();
 
@@ -127,7 +128,7 @@ void main(void)
             }else {
                 GPIO_WriteHigh(LED_GPIO_PORT, LED_GPIO_PINS);
             }
-          
+            
 //            sprintf(buf, "%dm%ds\n", min,cnt);
 //           buflen = strlen(buf);
 //            uart1_send_str(buf, buflen);
@@ -135,6 +136,13 @@ void main(void)
 //                buf[i] = 0;
 //            }
         }//end if(cnt_updated) 
+
+        if(GPIO_ReadInputPin(GPIOD, (GPIO_Pin_TypeDef)GPIO_PIN_4) && !buttom_sta_last) {
+            buttom_sta_last = 1;
+            GPIO_WriteReverse(LED_GPIO_PORT, LED_GPIO_PINS);
+        }else if(!GPIO_ReadInputPin(GPIOD, (GPIO_Pin_TypeDef)GPIO_PIN_4) && buttom_sta_last) {
+            buttom_sta_last = 0;
+        }
     }//end while(1)
   
 }
