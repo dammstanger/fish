@@ -33,12 +33,19 @@
 /* Private defines -----------------------------------------------------------*/
 #define LED_GPIO_PORT  (GPIOB)
 #define LED_GPIO_PINS  (GPIO_PIN_5)
+#define LED_ON (GPIO_WriteLow(LED_GPIO_PORT, LED_GPIO_PINS))
+#define LED_OFF (GPIO_WriteHigh(LED_GPIO_PORT, LED_GPIO_PINS))
 
 #define PWR_LIGHT_GPIO_PORT  (GPIOA)
 #define PWR_LIGHT_GPIO_PINS  (GPIO_PIN_3)
 
 #define PWR_FAN_GPIO_PORT  (GPIOA)
 #define PWR_FAN_GPIO_PINS  (GPIO_PIN_2)
+
+#define SERVO_GPIO_PORT  (GPIOC)
+#define SERVO_GPIO_PINS  (GPIO_PIN_7)
+
+#define S1_PUSH GPIO_ReadInputPin(GPIOD, (GPIO_Pin_TypeDef)GPIO_PIN_4)
 
 #define LIGHT_ON GPIO_WriteHigh(PWR_LIGHT_GPIO_PORT, PWR_LIGHT_GPIO_PINS)
 #define LIGHT_OFF GPIO_WriteLow(PWR_LIGHT_GPIO_PORT, PWR_LIGHT_GPIO_PINS)
@@ -49,8 +56,9 @@
 //#define CCR2_Val ((uint16_t)488)
 //#define CCR3_Val  ((uint16_t)244)
 /* Private function prototypes -----------------------------------------------*/
-void Delay (uint16_t nCount);
+void Delay (uint32_t nCount);
 static void TIM2_Config(void);
+static void TIM1_Config(void);
 
 void uart1_config(void);
 void uart1_send_str(char *str, uint16_t len);
@@ -67,8 +75,12 @@ void main(void)
 {
   
 //    uint8_t buflen = 0;
-//    uint8_t i = 0;
+    uint8_t i = 0;
     uint8_t buttom_sta_last = 0;
+    uint8_t lock_unlock_cnt = 0;
+    uint8_t set_mode = 0;
+    uint8_t start_hour = 7;             //from0-23
+    uint8_t display_loop = 0;
     
     /*High speed internal clock prescaler: 1*/
     CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
@@ -78,41 +90,43 @@ void main(void)
     GPIO_Init(PWR_LIGHT_GPIO_PORT, (GPIO_Pin_TypeDef)PWR_LIGHT_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
     GPIO_Init(PWR_FAN_GPIO_PORT, (GPIO_Pin_TypeDef)PWR_FAN_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
     GPIO_Init(GPIOD, (GPIO_Pin_TypeDef)GPIO_PIN_4, GPIO_MODE_IN_FL_NO_IT);
-
+    LED_OFF;
 //    uart1_config();
 
+//    TIM1_Config();
     TIM2_Config();
     
     enableInterrupts();
 
     while (1)
     {
-        Delay(0xFFF);
-        
+//      if(!set_mode){
+//        Delay(0xFFF);
+//      }        
         //1second update
         if(cnt_updated) {
             cnt_updated = 0;
             //minutes
-            if(cnt==60) {
+            if(cnt>=60) {
                 cnt = 0;
                 min++;
             }
             //hours
-            if(min==60) {
+            if(min>=60) {
                 min = 0;
                 hour++;
             }
             //1 day loop
-            if(hour==24) {
+            if(hour>=24) {
                 hour = 0;
             }
 
             //we turn on light when in first 5hours in a day,
             //assume we start system at 7:00 am
-            if(hour<5) {
+            if(hour>=7 && hour<11) {
                 LIGHT_ON;
                 FAN_OFF;
-            }else if(hour>=5 && hour<14) {
+            }else if(hour>=12 && hour<21) {
                 LIGHT_OFF;
                 FAN_ON;
             }else {
@@ -120,13 +134,74 @@ void main(void)
                 FAN_OFF;                
             }
             
-          
+//            if(S1_PUSH) {
+//               LED_ON;
+//            }else{
+//              LED_OFF;
+//            }
+//            //button==============================
+            if(S1_PUSH && !set_mode) {
+              lock_unlock_cnt++;
+              LED_ON;
+              if(lock_unlock_cnt>3) {
+                lock_unlock_cnt = 0;
+                set_mode = 1;
+                LED_OFF;
+                Delay(0xFFFF);
+                LED_ON;
+                Delay(0xFFFF);
+                LED_OFF;
+                Delay(0xFFFF);
+                LED_ON;
+                Delay(0xFFFF);
+                LED_OFF;
+                //block to prevent set hour here
+                buttom_sta_last = 0;
+                while(S1_PUSH);
+              }
+            }else if(S1_PUSH && set_mode){
+              lock_unlock_cnt++;
+              display_loop = 0;
+              if(lock_unlock_cnt>3) {
+                lock_unlock_cnt = 0;
+                set_mode = 0;
+                LED_OFF;
+                Delay(0xFFFF);
+                LED_ON;
+                Delay(0xFFFF);
+                LED_OFF;
+                Delay(0xFFFF);
+                LED_ON;
+                Delay(0xFFFF);
+                LED_OFF;
+                
+                //set
+                hour = start_hour;
+                min = 0;
+                cnt = 0;
+                
+                buttom_sta_last = 0;
+                while(S1_PUSH);
+              }
+            }else {
+              lock_unlock_cnt = 0;
+            }
+            
+            if(set_mode) {
+              display_loop++;
+              display_loop &= 3;
+            }
+            
+              
+              
             //debug===============================
             //led indicate
-            if(cnt%5==0) {
-                GPIO_WriteLow(LED_GPIO_PORT, LED_GPIO_PINS);
-            }else {
-                GPIO_WriteHigh(LED_GPIO_PORT, LED_GPIO_PINS);
+            if(!set_mode && !S1_PUSH) {
+              if(cnt%5==0) {
+                  LED_ON;
+              }else {
+                  LED_OFF;
+              }
             }
             
 //            sprintf(buf, "%dm%ds\n", min,cnt);
@@ -137,11 +212,33 @@ void main(void)
 //            }
         }//end if(cnt_updated) 
 
-        if(GPIO_ReadInputPin(GPIOD, (GPIO_Pin_TypeDef)GPIO_PIN_4) && !buttom_sta_last) {
+        
+        if(set_mode) {
+          if(S1_PUSH && !buttom_sta_last) {
             buttom_sta_last = 1;
-            GPIO_WriteReverse(LED_GPIO_PORT, LED_GPIO_PINS);
-        }else if(!GPIO_ReadInputPin(GPIOD, (GPIO_Pin_TypeDef)GPIO_PIN_4) && buttom_sta_last) {
+          }else if(!S1_PUSH && buttom_sta_last) {
             buttom_sta_last = 0;
+            
+            start_hour++;
+            if(start_hour==24) {
+              start_hour = 0;
+            }
+          }else if(display_loop==3){
+              
+            for(i=start_hour/5; i>0; i--) {
+              LED_ON;
+              Delay(0x5FFFF);
+              LED_OFF;
+              Delay(0x1FFFF);
+            }
+            
+            for(i=start_hour%5; i>0; i--) {
+              LED_ON;
+              Delay(0x15FFF);
+              LED_OFF;
+              Delay(0x15FFF);
+            }
+          }
         }
     }//end while(1)
   
@@ -153,7 +250,7 @@ void main(void)
   * @param nCount
   * @retval None
   */
-void Delay(uint16_t nCount)
+void Delay(uint32_t nCount)
 {
     /* Decrement nCount value */
     while (nCount != 0)
@@ -236,6 +333,56 @@ static void TIM2_Config(void)
   TIM2_Cmd(ENABLE);
 }
 
+/**
+  * @brief  Configure TIM1 to generate 7 PWM signals with 4 different duty cycles
+  * @param  None
+  * @retval None
+  */
+static void TIM1_Config(void)
+{
+
+   TIM1_DeInit();
+
+  /* Time Base configuration */
+  /*
+  TIM1_Period = 4095
+  TIM1_Prescaler = 0
+  TIM1_CounterMode = TIM1_COUNTERMODE_UP
+  TIM1_RepetitionCounter = 0
+  */
+   
+  //预分频=0时，默认 16M/8 = 2M,
+  //预分频=n时16M/(n+1)    
+  //16M/(15+1) = 1MHz, 1M/(19999+1-0) = 50Hz
+  TIM1_TimeBaseInit(15, TIM1_COUNTERMODE_UP, 19999, 0);                
+
+  /* Channel 1, 2,3 and 4 Configuration in PWM mode */
+  
+  /*
+  TIM1_OCMode = TIM1_OCMODE_PWM2
+  TIM1_OutputState = TIM1_OUTPUTSTATE_ENABLE
+  TIM1_OutputNState = TIM1_OUTPUTNSTATE_ENABLE
+  TIM1_Pulse = CCR1_Val
+  TIM1_OCPolarity = TIM1_OCPOLARITY_LOW
+  TIM1_OCNPolarity = TIM1_OCNPOLARITY_HIGH
+  TIM1_OCIdleState = TIM1_OCIDLESTATE_SET
+  TIM1_OCNIdleState = TIM1_OCIDLESTATE_RESET
+  */
+
+  /*TIM1_Pulse = CCR2_Val*/
+  TIM1_OC2Init(TIM1_OCMODE_PWM1, TIM1_OUTPUTSTATE_ENABLE, TIM1_OUTPUTNSTATE_ENABLE, 1000,
+               TIM1_OCPOLARITY_LOW, TIM1_OCNPOLARITY_HIGH, TIM1_OCIDLESTATE_SET, 
+               TIM1_OCNIDLESTATE_RESET);
+
+  /*enable interrupt*/
+  TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
+  
+  /* TIM1 counter enable */
+  TIM1_Cmd(ENABLE);
+
+  /* TIM1 Main Output Enable */
+  TIM1_CtrlPWMOutputs(ENABLE);
+}
 
 #ifdef USE_FULL_ASSERT
 

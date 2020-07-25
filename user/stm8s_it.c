@@ -224,6 +224,13 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+  
+    if (TIM1_GetITStatus(TIM1_IT_UPDATE) != RESET)
+  {
+    /* Clear TIM1 update interrupt pending bit*/
+    TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
+//    GPIO_WriteReverse(GPIOB, GPIO_PIN_5);
+  }
 }
 
 /**

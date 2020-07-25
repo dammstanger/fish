@@ -54,6 +54,7 @@
 /Output/
 /Listing/
 /Debug/
+/settings/
 
 #My config	自定义配置，写后缀即可，子文件夹内的该类文件也会被忽略
 #屏蔽整个文件夹target写法：target/
